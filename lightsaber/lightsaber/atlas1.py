@@ -192,7 +192,7 @@ class TrajectoryNode(Node):
         self.now = self.now + rclpy.time.Duration(seconds=self.dt)
 
         # fix pelvis in the world frame
-        ppelvis = pxyz(0.0, 0.0, 0.0)
+        ppelvis = pxyz(0.0, 0.0, 1.0)
         Rpelvis = Reye()
 
         # extract current right-arm joint vector
