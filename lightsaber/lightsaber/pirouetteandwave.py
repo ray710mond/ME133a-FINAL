@@ -73,6 +73,21 @@ class TrajectoryNode(Node):
 
         # Define the list of joint names MATCHING THE JOINT NAMES IN THE URDF!
         self.jointnames = atlasnames
+        
+        # State for Atlas joints (all joints, but we only move right arm)
+        self.qc   = np.zeros(len(self.jointnames))
+        self.qdot = np.zeros(len(self.jointnames))
+
+        # Right arm joint set (subset of atlasnames)
+        self.arm_joint_names = ['r_arm_shz', 'r_arm_shx',
+                                'r_arm_ely', 'r_arm_elx',
+                                'r_arm_wry', 'r_arm_wrx']
+        self.arm_idx = [self.jointnames.index(n) for n in self.arm_joint_names]
+
+        # inverse kinematics
+        self.lam     = 1.0
+        self.dq_num  = 1e-4
+        self.p_target = np.array([1.0, 0.0, 0.5])   # target hand position
 
 
         ##############################################################
@@ -97,6 +112,71 @@ class TrajectoryNode(Node):
                                (self.dt, 1/self.dt))
                                
         self.pubmarker = self.create_publisher(Marker, '/marker', 10)
+    
+    
+    def _T(self, R, p): # t matrix function
+        T = np.eye(4)
+        T[0:3, 0:3] = R
+        T[0:3, 3]   = p
+        return T
+
+    def fk_right_hand(self, q): # forward kinematics
+        # joints
+        q_shz = q[0]
+        q_shx = q[1]
+        q_ely = q[2]
+        q_elx = q[3]
+        q_wry = q[4]
+        q_wrx = q[5]
+
+        # with pelvis at world (0,0,0), utorso offset by this
+        T = self._T(Reye(), np.array([-0.0125, 0.0, 0.212]))
+
+        # 1) r_arm_shz
+        T = T @ self._T(Rotz(q_shz), np.array([0.1406, -0.2256, 0.4776]))
+
+        # 2) r_arm_shx
+        T = T @ self._T(Rotx(q_shx), np.array([0.0, -0.11, -0.245]))
+
+        # 3) r_arm_ely
+        T = T @ self._T(Roty(q_ely), np.array([0.0, -0.187, -0.016]))
+
+        # 4) r_arm_elx
+        T = T @ self._T(Rotx(q_elx), np.array([0.0, -0.119, 0.0092]))
+
+        # 5) r_arm_wry
+        T = T @ self._T(Roty(q_wry), np.array([0.0, -0.29955, -0.00921]))
+
+        # 6) r_arm_wrx
+        T = T @ self._T(Rotx(q_wrx), np.array([0.0, 0.0, 0.0]))
+
+        # 7) fixed wrist2 + hand link
+        T = T @ self._T(Reye(), np.array([0.0, -0.06, 0.0]))
+
+        # 8) hand to saber middle offset from URDF
+        saber_offset = np.array([0.0, 0.0, 0.41*2])
+        T = T @ self._T(Reye(), saber_offset)
+
+        # return saber tip position
+        return T[0:3, 3]
+
+
+    def jacobian_right_hand(self, q):
+        J = np.zeros((3, 6))
+        dq = self.dq_num
+
+        for i in range(6):
+            q_plus  = q.copy()
+            q_minus = q.copy()
+            q_plus[i]  += dq
+            q_minus[i] -= dq
+
+            p_plus  = self.fk_right_hand(q_plus)
+            p_minus = self.fk_right_hand(q_minus)
+
+            J[:, i] = (p_plus - p_minus) / (2.0 * dq)
+
+        return J
 
     # Shutdown
     def shutdown(self):
@@ -105,88 +185,64 @@ class TrajectoryNode(Node):
         self.destroy_node()
 
 
-    # Update - send a new joint command every time step.
+    # Update function
     def update(self):
         # increment time
         self.t   = self.t + self.dt
         self.now = self.now + rclpy.time.Duration(seconds=self.dt)
 
-        # pelvis fixed at world
+        # fix pelvis in the world frame
         ppelvis = pxyz(0.0, 0.0, 0.0)
-        Rpelvis = Rotz(0.0)
+        Rpelvis = Reye()
 
-        # des saber target
-        p_target = np.array([1.0, 0.0, 0.0])
-        
-        # cubic spline
-        T = 40
-        if self.t < 0:
-            s = 0.0
-        elif self.t < T:
-            tau = self.t / T
-            s = 3*tau**2 - 2*tau**3
-        else:
-            s = 1.0
+        # extract current right-arm joint vector
+        q_arm = np.array([self.qc[i] for i in self.arm_idx])
 
-        # Desired point in world frame
-        p_des = s * p_target
+        # compute current hand position and task-space error (circle)
+        Cx = 1.0
+        Cy = 0.0
+        Cz = 0.5
+        R  = 0.25
+        omega = 0.1   # rad/sec
 
-        # Allocate joint arrays
-        qc    = np.zeros(len(self.jointnames))
-        qcdot = np.zeros(len(self.jointnames))
+        theta = omega * self.t
 
-        # Joint indices
-        j_shz = self.jointnames.index('r_arm_shz')
-        j_shx = self.jointnames.index('r_arm_shx')
-        j_ely = self.jointnames.index('r_arm_ely')
-        j_elx = self.jointnames.index('r_arm_elx')
-
-        ###############################################################
-        # NEED IN THIS SECTION BELOW
-        # WE CAN ALSO CALCULATE THE FORWARD KIN, 
-        # MIGHT JUST SCRAP THIS BELOW
-        # shoulder origin from URDF
-        # could also make pelvis not fixed at world
-        shoulder = np.array([
-            -0.0581 + 0.1406,   # x
-             0.0     - 0.2256,  # y
-             0.162 + 0.05 + 0.3056 + 0.4776  # z
+        # target trajectory in world frame
+        self.p_target = np.array([
+            Cx,
+            Cy + R*np.cos(theta),
+            Cz + R*np.sin(theta)
         ])
 
-        # Tip offset
-        tip_offset = np.array([0.0, -0.09, 0.40])
+        # compute current end effector position and task error
+        p_hand = self.fk_right_hand(q_arm)
+        e      = self.p_target - p_hand
 
-        # Desired wrist position
-        p_des_hand = p_des - tip_offset
+        # simple first-order reference velocity towards the goal
+        xdot = self.lam * e 
 
-        # IK vector shoulder → hand
-        v = p_des_hand - shoulder
-        dist = np.linalg.norm(v)
+        # numerical jacobian and joint velocity 
+        J = self.jacobian_right_hand(q_arm) # 3x6
 
-        # Arm link lengths
-        L1 = 0.30
-        L2 = 0.30
+        # under-determined: 3 eqns, 6 unknowns, least squares
+        qdot_arm, *_ = np.linalg.lstsq(J, xdot, rcond=None)
 
-        # Elbow IK with clamping
-        dist_clamped = max(min(dist, L1+L2-1e-6), abs(L1-L2)+1e-6)
-        cos_elbow = (L1**2 + L2**2 - dist_clamped**2) / (2*L1*L2)
-        elbow = -(pi - acos(cos_elbow))
-        qc[j_elx] = elbow
+        # integrate arm joints
+        q_arm_new = q_arm + self.dt * qdot_arm
 
-        # Shoulder yaw
-        shz = atan2(v[1], v[0])
-        qc[j_shz] = shz
+        # write arm joints back into full Atlas joint vector
+        qc    = self.qc.copy()
+        qcdot = np.zeros_like(self.qc)
 
-        # Shoulder pitch
-        horiz = sqrt(v[0]**2 + v[1]**2)
-        shx = atan2(v[2], horiz)
-        qc[j_shx] = shx
+        for k, idx in enumerate(self.arm_idx):
+            qc[idx]    = q_arm_new[k]
+            qcdot[idx] = qdot_arm[k]
 
-        # No forearm twist
-        qc[j_ely] = 0.0
-        #############################################################
-
-
+        # save
+        self.qc   = qc
+        self.qdot = qcdot
+        
+        
         # Finish by publishing the data
         header=Header(stamp=self.now.to_msg(), frame_id='world')
         self.pubjoint.publish(JointState(
@@ -207,9 +263,10 @@ class TrajectoryNode(Node):
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
         # Position
-        marker.pose.position.x = 1.0
-        marker.pose.position.y = 0.0
-        marker.pose.position.z = 0.0
+        marker.pose.position.x = float(self.p_target[0])
+        marker.pose.position.y = float(self.p_target[1])
+        marker.pose.position.z = float(self.p_target[2])
+
         # Orientation (no rotation)
         marker.pose.orientation.x = 0.0
         marker.pose.orientation.y = 0.0
