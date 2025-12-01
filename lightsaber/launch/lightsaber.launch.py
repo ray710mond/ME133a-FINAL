@@ -33,7 +33,7 @@ def generate_launch_description():
     rvizcfg = os.path.join(pkgdir('utils'), 'rviz/viewurdf.rviz')
 
     # Locate the URDF file.
-    urdf = os.path.join(pkgdir('atlas_description'), 'urdf/atlas_v5.urdf')
+    urdf = os.path.join(pkgdir('lightsaber'), 'urdf/atlas_v5.urdf')
 
     # Load the robot's URDF file (XML).
     with open(urdf, 'r') as file:
@@ -62,9 +62,9 @@ def generate_launch_description():
 
     # Configure a node for the pirouette and wave demo.
     node_pirouette = Node(
-        name       = 'pirouetteandwave',
-        package    = 'demos',
-        executable = 'pirouetteandwave',
+        name       = 'lightsaber',
+        package    = 'lightsaber',
+        executable = 'lightsaber',
         output     = 'screen')
 
 

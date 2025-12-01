@@ -31,7 +31,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'pirouetteandwave      = lightsaber.pirouetteandwave:main',
+            'lightsaber      = lightsaber.lightsaber:main',
         ],
     },
 )
