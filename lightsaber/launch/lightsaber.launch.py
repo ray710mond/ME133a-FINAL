@@ -30,7 +30,7 @@ def generate_launch_description():
     # LOCATE FILES
 
     # Locate the RVIZ configuration file.
-    rvizcfg = os.path.join(pkgdir('utils'), 'rviz/viewurdf.rviz')
+    rvizcfg = os.path.join(pkgdir('lightsaber'), 'rviz/lightsaber.rviz')
 
     # Locate the URDF file.
     urdf = os.path.join(pkgdir('lightsaber'), 'urdf/atlas_v5.urdf')
@@ -44,12 +44,29 @@ def generate_launch_description():
     # PREPARE THE LAUNCH ELEMENTS
 
     # Configure a node for the robot_state_publisher.
-    node_robot_state_publisher = Node(
-        name       = 'robot_state_publisher', 
+    node_robot_state_publisher1 = Node(
+        name       = 'robot_state_publisher',
+        namespace  = 'atlas1',
         package    = 'robot_state_publisher',
         executable = 'robot_state_publisher',
         output     = 'screen',
-        parameters = [{'robot_description': robot_description}])
+        parameters = [
+            {'robot_description': robot_description},
+            {'frame_prefix': 'atlas1/'},
+        ],
+    )
+
+    node_robot_state_publisher2 = Node(
+        name       = 'robot_state_publisher',
+        namespace  = 'atlas2',
+        package    = 'robot_state_publisher',
+        executable = 'robot_state_publisher',
+        output     = 'screen',
+        parameters = [
+            {'robot_description': robot_description},
+            {'frame_prefix': 'atlas2/'},
+        ],
+    )
 
     # Configure a node for RVIZ.
     node_rviz = Node(
@@ -61,10 +78,18 @@ def generate_launch_description():
         on_exit    = Shutdown())
 
     # Configure a node for the pirouette and wave demo.
-    node_pirouette = Node(
+    atlas1 = Node(
         name       = 'lightsaber',
+        namespace = 'atlas1',
         package    = 'lightsaber',
-        executable = 'lightsaber',
+        executable = 'atlas1',
+        output     = 'screen')
+    
+    atlas2 = Node(
+        name       = 'lightsaber',
+        namespace = 'atlas2',
+        package    = 'lightsaber',
+        executable = 'atlas2',
         output     = 'screen')
 
 
@@ -73,7 +98,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         # Start the robot_state_publisher, RVIZ, and the demo.
-        node_robot_state_publisher,
+        node_robot_state_publisher1,
+        node_robot_state_publisher2,
         node_rviz,
-        node_pirouette,
+        atlas1,
+        atlas2,
     ])

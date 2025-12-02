@@ -10,6 +10,7 @@ package_name = 'lightsaber'
 otherfiles = [
     ('share/' + package_name + '/launch', glob('launch/*')),
     ('share/' + package_name + '/urdf',   glob('urdf/*')),
+    ('share/' + package_name + '/rviz', glob('rviz/*')),
 ]
 
 
@@ -31,7 +32,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'lightsaber      = lightsaber.lightsaber:main',
+            'atlas1      = lightsaber.atlas1:main',
+            'atlas2      = lightsaber.atlas2:main',
         ],
     },
 )
