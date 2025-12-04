@@ -16,19 +16,23 @@ def generate_launch_description():
     pkg_lightsaber   = get_package_share_directory('lightsaber')
 
     # URDF for Atlas + saber
-    urdf_path = os.path.join(pkg_lightsaber, 'urdf', 'atlas_v5.urdf')
+    urdf_path = os.path.join(pkg_lightsaber, 'urdf', 'atlas_gazebo.urdf')
+
+    world_path = os.path.join(get_package_share_directory('lightsaber'), 'gazebo', 'lightsaber.sdf')
 
     # -------------------------------------------------------------
     # 1) Launch Gazebo (new Gazebo via ros_gz_sim)
     #    This is equivalent to: `gz sim -r -v4`
     #    (-r = run immediately, -v4 = verbose, runs server+GUI)
     # -------------------------------------------------------------
+
+
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(ros_gz_sim_share, 'launch', 'gz_sim.launch.py')
         ),
         launch_arguments={
-            'gz_args': '-r -v4 empty.sdf'
+            'gz_args': f'-r -v4 {world_path}'
         }.items(),
     )
 
@@ -95,7 +99,7 @@ def generate_launch_description():
             '-y', '0.0',
             '-z', '1.0',
             # 180° about Z if you want them facing each other:
-            # '-Y', '3.14159',
+            '-Y', '3.14159',
         ],
     )
 

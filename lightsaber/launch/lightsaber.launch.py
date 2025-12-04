@@ -18,10 +18,12 @@ def generate_launch_description():
     pkg_lightsaber   = get_package_share_directory('lightsaber')
 
     # URDF for Atlas + saber
-    urdf_path = os.path.join(pkg_lightsaber, 'urdf', 'atlas_v5.urdf')
+    urdf_path = os.path.join(pkg_lightsaber, 'urdf', 'atlas_gazebo.urdf')
 
     # RViz config
     rviz_config = os.path.join(pkg_lightsaber, 'rviz', 'lightsaber.rviz')
+
+    world_path = os.path.join(get_package_share_directory('lightsaber'), 'gazebo', 'lightsaber.sdf')
 
     # ------------------------------------------------------------------
     # 1) Gazebo (new Gazebo via ros_gz_sim)
@@ -34,9 +36,10 @@ def generate_launch_description():
             os.path.join(ros_gz_sim_share, 'launch', 'gz_sim.launch.py')
         ),
         launch_arguments={
-            'gz_args': '-r -v4 empty.sdf'
+            'gz_args': f'-r -v4 {world_path}'
         }.items(),
     )
+
 
     # ------------------------------------------------------------------
     # 2) Robot State Publishers (for TF / RViz)
