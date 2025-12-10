@@ -6,7 +6,6 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
-        - /RobotModel2
       Splitter Ratio: 0.5
     Tree Height: 647
   - Class: rviz_common/Selection
@@ -48,267 +47,18 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Class: rviz_default_plugins/TF
+    - Class: rviz_default_plugins/Marker
       Enabled: true
-      Filter (blacklist): ""
-      Filter (whitelist): ""
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        atlas1/head:
-          Value: true
-        atlas1/l_clav:
-          Value: true
-        atlas1/l_foot:
-          Value: true
-        atlas1/l_hand:
-          Value: true
-        atlas1/l_larm:
-          Value: true
-        atlas1/l_lfarm:
-          Value: true
-        atlas1/l_lglut:
-          Value: true
-        atlas1/l_lleg:
-          Value: true
-        atlas1/l_scap:
-          Value: true
-        atlas1/l_situational_awareness_camera_link:
-          Value: true
-        atlas1/l_situational_awareness_camera_optical_frame:
-          Value: true
-        atlas1/l_talus:
-          Value: true
-        atlas1/l_uarm:
-          Value: true
-        atlas1/l_ufarm:
-          Value: true
-        atlas1/l_uglut:
-          Value: true
-        atlas1/l_uleg:
-          Value: true
-        atlas1/ltorso:
-          Value: true
-        atlas1/mtorso:
-          Value: true
-        atlas1/pelvis:
-          Value: true
-        atlas1/r_clav:
-          Value: true
-        atlas1/r_foot:
-          Value: true
-        atlas1/r_hand:
-          Value: true
-        atlas1/r_larm:
-          Value: true
-        atlas1/r_lfarm:
-          Value: true
-        atlas1/r_lglut:
-          Value: true
-        atlas1/r_lleg:
-          Value: true
-        atlas1/r_saber:
-          Value: true
-        atlas1/r_scap:
-          Value: true
-        atlas1/r_situational_awareness_camera_link:
-          Value: true
-        atlas1/r_situational_awareness_camera_optical_frame:
-          Value: true
-        atlas1/r_talus:
-          Value: true
-        atlas1/r_uarm:
-          Value: true
-        atlas1/r_ufarm:
-          Value: true
-        atlas1/r_uglut:
-          Value: true
-        atlas1/r_uleg:
-          Value: true
-        atlas1/rear_situational_awareness_camera_link:
-          Value: true
-        atlas1/rear_situational_awareness_camera_optical_frame:
-          Value: true
-        atlas1/utorso:
-          Value: true
-        atlas2/head:
-          Value: true
-        atlas2/l_clav:
-          Value: true
-        atlas2/l_foot:
-          Value: true
-        atlas2/l_hand:
-          Value: true
-        atlas2/l_larm:
-          Value: true
-        atlas2/l_lfarm:
-          Value: true
-        atlas2/l_lglut:
-          Value: true
-        atlas2/l_lleg:
-          Value: true
-        atlas2/l_scap:
-          Value: true
-        atlas2/l_situational_awareness_camera_link:
-          Value: true
-        atlas2/l_situational_awareness_camera_optical_frame:
-          Value: true
-        atlas2/l_talus:
-          Value: true
-        atlas2/l_uarm:
-          Value: true
-        atlas2/l_ufarm:
-          Value: true
-        atlas2/l_uglut:
-          Value: true
-        atlas2/l_uleg:
-          Value: true
-        atlas2/ltorso:
-          Value: true
-        atlas2/mtorso:
-          Value: true
-        atlas2/pelvis:
-          Value: true
-        atlas2/r_clav:
-          Value: true
-        atlas2/r_foot:
-          Value: true
-        atlas2/r_hand:
-          Value: true
-        atlas2/r_larm:
-          Value: true
-        atlas2/r_lfarm:
-          Value: true
-        atlas2/r_lglut:
-          Value: true
-        atlas2/r_lleg:
-          Value: true
-        atlas2/r_saber:
-          Value: true
-        atlas2/r_scap:
-          Value: true
-        atlas2/r_situational_awareness_camera_link:
-          Value: true
-        atlas2/r_situational_awareness_camera_optical_frame:
-          Value: true
-        atlas2/r_talus:
-          Value: true
-        atlas2/r_uarm:
-          Value: true
-        atlas2/r_ufarm:
-          Value: true
-        atlas2/r_uglut:
-          Value: true
-        atlas2/r_uleg:
-          Value: true
-        atlas2/rear_situational_awareness_camera_link:
-          Value: true
-        atlas2/rear_situational_awareness_camera_optical_frame:
-          Value: true
-        atlas2/utorso:
-          Value: true
-        world:
-          Value: true
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Tree:
-        world:
-          atlas1/pelvis:
-            atlas1/l_uglut:
-              atlas1/l_lglut:
-                atlas1/l_uleg:
-                  atlas1/l_lleg:
-                    atlas1/l_talus:
-                      atlas1/l_foot:
-                        {}
-            atlas1/ltorso:
-              atlas1/mtorso:
-                atlas1/utorso:
-                  atlas1/head:
-                    {}
-                  atlas1/l_clav:
-                    atlas1/l_scap:
-                      atlas1/l_uarm:
-                        atlas1/l_larm:
-                          atlas1/l_ufarm:
-                            atlas1/l_lfarm:
-                              atlas1/l_hand:
-                                {}
-                  atlas1/l_situational_awareness_camera_link:
-                    atlas1/l_situational_awareness_camera_optical_frame:
-                      {}
-                  atlas1/r_clav:
-                    atlas1/r_scap:
-                      atlas1/r_uarm:
-                        atlas1/r_larm:
-                          atlas1/r_ufarm:
-                            atlas1/r_lfarm:
-                              atlas1/r_hand:
-                                atlas1/r_saber:
-                                  {}
-                  atlas1/r_situational_awareness_camera_link:
-                    atlas1/r_situational_awareness_camera_optical_frame:
-                      {}
-                  atlas1/rear_situational_awareness_camera_link:
-                    atlas1/rear_situational_awareness_camera_optical_frame:
-                      {}
-            atlas1/r_uglut:
-              atlas1/r_lglut:
-                atlas1/r_uleg:
-                  atlas1/r_lleg:
-                    atlas1/r_talus:
-                      atlas1/r_foot:
-                        {}
-          atlas2/pelvis:
-            atlas2/l_uglut:
-              atlas2/l_lglut:
-                atlas2/l_uleg:
-                  atlas2/l_lleg:
-                    atlas2/l_talus:
-                      atlas2/l_foot:
-                        {}
-            atlas2/ltorso:
-              atlas2/mtorso:
-                atlas2/utorso:
-                  atlas2/head:
-                    {}
-                  atlas2/l_clav:
-                    atlas2/l_scap:
-                      atlas2/l_uarm:
-                        atlas2/l_larm:
-                          atlas2/l_ufarm:
-                            atlas2/l_lfarm:
-                              atlas2/l_hand:
-                                {}
-                  atlas2/l_situational_awareness_camera_link:
-                    atlas2/l_situational_awareness_camera_optical_frame:
-                      {}
-                  atlas2/r_clav:
-                    atlas2/r_scap:
-                      atlas2/r_uarm:
-                        atlas2/r_larm:
-                          atlas2/r_ufarm:
-                            atlas2/r_lfarm:
-                              atlas2/r_hand:
-                                atlas2/r_saber:
-                                  {}
-                  atlas2/r_situational_awareness_camera_link:
-                    atlas2/r_situational_awareness_camera_optical_frame:
-                      {}
-                  atlas2/rear_situational_awareness_camera_link:
-                    atlas2/rear_situational_awareness_camera_optical_frame:
-                      {}
-            atlas2/r_uglut:
-              atlas2/r_lglut:
-                atlas2/r_uleg:
-                  atlas2/r_lleg:
-                    atlas2/r_talus:
-                      atlas2/r_foot:
-                        {}
-      Update Interval: 0
+      Name: Marker
+      Namespaces:
+        shared_random_target: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /shared_target_marker
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel
@@ -731,12 +481,28 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz_default_plugins/Axes
-      Enabled: true
+      Enabled: false
       Length: 1
       Name: Axes
       Radius: 0.10000000149011612
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
+    - Class: rviz_default_plugins/TF
+      Enabled: false
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -798,10 +564,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.3453987240791321
+      Pitch: 0.43539905548095703
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.8772145509719849
+      Yaw: 4.702211856842041
     Saved: ~
 Window Geometry:
   Displays:

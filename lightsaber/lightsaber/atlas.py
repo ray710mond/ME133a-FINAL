@@ -1,31 +1,18 @@
-'''pirouetteandwave.py
-
-   This is a demo for moving/placing an ungrounded robot and moving joints.
-
-   Multi-robot usage:
-     - Run this node in a namespace (e.g. atlas2).
-     - robot_name parameter must match the frame_prefix used in
-       robot_state_publisher (e.g. "atlas2" -> frames "atlas2/pelvis", ...).
-     - Publishes <ns>/joint_states.
-     - Broadcasts world -> <robot_name>/pelvis.
-     - Publishes saber tip position on /<robot_name>_pos.
-     - Subscribes to /<other_robot_name>_pos for "fight" behavior.
-'''
-
+#!/usr/bin/env python3
 import rclpy
 import numpy as np
 
 from math                        import pi, sin, cos
-from asyncio                    import Future
-from rclpy.node                 import Node
-from tf2_ros                    import TransformBroadcaster
+from random                      import uniform
+from asyncio                     import Future
+from rclpy.node                  import Node
+from tf2_ros                     import TransformBroadcaster
 
-from geometry_msgs.msg          import TransformStamped, Twist
-from sensor_msgs.msg            import JointState
-from std_msgs.msg               import Header
+from geometry_msgs.msg           import TransformStamped, Twist
+from sensor_msgs.msg             import JointState
+from std_msgs.msg                import Header
 
-from utils.TransformHelpers     import *
-from visualization_msgs.msg     import Marker
+from utils.TransformHelpers      import *
 
 
 #
@@ -60,23 +47,46 @@ class TrajectoryNode(Node):
         ##############################################################
         # PARAMETERS TO SELECT WHICH ROBOT WE ARE CONTROLLING
 
+        # Which robot am I?
         self.robot_name = self.declare_parameter(
-            'robot_name', 'atlas2'
+            'robot_name', 'atlas1'
         ).get_parameter_value().string_value
 
+        # Which robot is the "other" one (kept for logging/debug if needed)
         self.other_robot_name = self.declare_parameter(
-            'other_robot_name', 'atlas1'
+            'other_robot_name', 'atlas2'
         ).get_parameter_value().string_value
 
-        # pelvis frame must match frame_prefix + "pelvis"
+        # Frames
         self.pelvis_frame = f'{self.robot_name}/pelvis'
         self.world_frame  = 'world'
 
         ##############################################################
-        # INITIALIZE YOUR TRAJECTORY DATA!
+        # PELVIS POSE PARAMETERS (WORLD -> <robot_name>/pelvis)
+
+        # Position of pelvis in world
+        self.declare_parameter('pelvis_xyz', [0.0, 0.0, 1.0])
+        pelvis_xyz = np.array(self.get_parameter('pelvis_xyz').value,
+                              dtype=float).flatten()
+        if pelvis_xyz.size != 3:
+            raise ValueError("pelvis_xyz must be a list of 3 numbers [x, y, z]")
+        self.ppelvis = pxyz(pelvis_xyz[0], pelvis_xyz[1], pelvis_xyz[2])
+
+        # Orientation of pelvis in world (roll, pitch, yaw)
+        # R = Rz(yaw) * Ry(pitch) * Rx(roll)
+        self.declare_parameter('pelvis_rpy', [0.0, 0.0, 0.0])
+        pelvis_rpy = np.array(self.get_parameter('pelvis_rpy').value,
+                              dtype=float).flatten()
+        if pelvis_rpy.size != 3:
+            raise ValueError("pelvis_rpy must be a list of 3 numbers [roll, pitch, yaw]")
+        roll, pitch, yaw = pelvis_rpy
+        self.Rpelvis = Rotz(yaw) @ Roty(pitch) @ Rotx(roll)
+
+        ##############################################################
+        # INITIALIZE TRAJECTORY DATA
 
         self.jointnames = atlasnames
-        
+
         self.qc   = np.zeros(len(self.jointnames))
         self.qdot = np.zeros(len(self.jointnames))
 
@@ -93,10 +103,18 @@ class TrajectoryNode(Node):
         self.has_external_target = False
 
         ##############################################################
-        # Setup the logistics of the node:
-        # Add publishers and a TF broadcaster.
+        # SHARED RANDOM TARGET (SAME FOR BOTH ROBOTS)
+        ##############################################################
 
-        # IMPORTANT: no leading '/' so this becomes <namespace>/joint_states
+        # All robots subscribe to the shared target (absolute topic)
+        self.shared_target_sub = self.create_subscription(
+            Twist, '/shared_target', self.sharedTargetCallback, 10
+        )
+
+        ##############################################################
+        # ROS I/O: Publishers, TF broadcaster, etc.
+
+        # IMPORTANT: relative names -> respect namespace
         self.pubjoint = self.create_publisher(JointState, 'joint_states', 10)
         self.tfbroad  = TransformBroadcaster(self)
 
@@ -110,29 +128,33 @@ class TrajectoryNode(Node):
         self.timer = self.create_timer(self.dt, self.update)
         self.get_logger().info("Running with dt of %f seconds (%fHz)" %
                                (self.dt, 1/self.dt))
-                               
-        self.pubmarker = self.create_publisher(Marker, 'marker', 10)
 
-        # Robot-specific position topic (global, for cross-robot comms)
-        my_pos_topic     = f'/{self.robot_name}_pos'
-        other_pos_topic  = f'/{self.other_robot_name}_pos'
+        # Robot-specific position topic (global, for visualization/debug)
+        my_pos_topic = f'/{self.robot_name}_pos'
 
         self.get_logger().info(f"Publishing my saber tip position on {my_pos_topic}")
-        self.get_logger().info(f"Subscribing to other robot position on {other_pos_topic}")
-
         self.pubpos = self.create_publisher(Twist, my_pos_topic, 10)
-        self.subpos = self.create_subscription(
-            Twist, other_pos_topic, self.newTarget, 10
-        )
-    
-    def newTarget(self, other_pos_msg):
-        # Use the other robot's saber tip as new target (WORLD frame)
+
+    ##############################################################
+    # Shared target callback
+    ##############################################################
+    def sharedTargetCallback(self, msg: Twist):
+        # Shared target in WORLD frame
         self.p_target = np.array([
-            other_pos_msg.linear.x,
-            other_pos_msg.linear.y,
-            other_pos_msg.linear.z
-        ])
+            msg.linear.x,
+            msg.linear.y,
+            msg.linear.z
+        ], dtype=float)
         self.has_external_target = True
+
+        # Debug log so you can see both robots receiving the target
+        self.get_logger().info(
+            f"{self.robot_name} got shared target: {self.p_target}"
+        )
+
+    ##############################################################
+    # Kinematics
+    ##############################################################
 
     def _T(self, R, p):  # t matrix function
         T = np.eye(4)
@@ -201,14 +223,14 @@ class TrajectoryNode(Node):
         self.t   = self.t + self.dt
         self.now = self.now + rclpy.time.Duration(seconds=self.dt)
 
-        # pelvis pose in world (this is atlas2: 1.5 m away, rotated 180 deg)
-        ppelvis = pxyz(1.5, 0.0, 1.0)
-        Rpelvis = Rotz(pi)
+        # pelvis pose in world (PARAMETERIZED)
+        ppelvis = self.ppelvis
+        Rpelvis = self.Rpelvis
 
         # right-arm joint vector
         q_arm = np.array([self.qc[i] for i in self.arm_idx])
 
-        # circular default target in world frame (used until we see the other robot)
+        # circular default target in world frame (used until we see shared target)
         Cx = 1.0
         Cy = 0.0
         Cz = 0.5
@@ -233,9 +255,9 @@ class TrajectoryNode(Node):
 
         # task-space error in world frame
         e     = self.p_target - p_tip_world
-        xdot  = self.lam * e 
+        xdot  = self.lam * e
 
-        # numerical jacobian in pelvis frame (OK; rotation doesn't change norms)
+        # numerical jacobian in pelvis frame
         J = self.jacobian_right_hand(q_arm)  # 3x6
 
         # under-determined: 3 eqns, 6 unknowns, least squares
@@ -254,7 +276,7 @@ class TrajectoryNode(Node):
 
         self.qc   = qc
         self.qdot = qcdot
-        
+
         # Publish joint states and TF
         header = Header(stamp=self.now.to_msg(), frame_id=self.world_frame)
 
@@ -269,29 +291,6 @@ class TrajectoryNode(Node):
             header=header,
             child_frame_id=self.pelvis_frame,
             transform=Transform_from_Rp(Rpelvis, ppelvis)))
-
-        # Publish marker at target (world frame)
-        marker = Marker()
-        marker.header = Header(stamp=self.now.to_msg(), frame_id=self.world_frame)
-        marker.ns = "target_point"
-        marker.id = 0
-        marker.type = Marker.SPHERE
-        marker.action = Marker.ADD
-        marker.pose.position.x = float(self.p_target[0])
-        marker.pose.position.y = float(self.p_target[1])
-        marker.pose.position.z = float(self.p_target[2])
-        marker.pose.orientation.x = 0.0
-        marker.pose.orientation.y = 0.0
-        marker.pose.orientation.z = 0.0
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = 0.05
-        marker.scale.y = 0.05
-        marker.scale.z = 0.05
-        marker.color.r = 1.0
-        marker.color.g = 0.0
-        marker.color.b = 0.0
-        marker.color.a = 1.0
-        self.pubmarker.publish(marker)
 
         # Publish this robot's saber tip *actual* world position
         my_pos_msg = Twist()

@@ -1,19 +1,6 @@
-"""Launch the pirouetting and waving demo
-
-   ros2 launch demos pirouetteandwave.launch.py
-
-   This launch file is intended as an example of how to spin an
-   ungrounded robot (humanoid) and wave programmatically.
-
-   This should start
-     1) RVIZ, ready to view the robot
-     2) The robot_state_publisher to broadcast the robot model
-     3) The pirouette and wave example code
-
-"""
-
 import os
 
+from math import pi
 from ament_index_python.packages import get_package_share_directory as pkgdir
 
 from launch                      import LaunchDescription
@@ -78,18 +65,38 @@ def generate_launch_description():
         on_exit    = Shutdown())
 
     # Configure a node for the pirouette and wave demo.
-    atlas1 = Node(
-        name       = 'lightsaber',
-        namespace = 'atlas1',
-        package    = 'lightsaber',
-        executable = 'atlas1',
-        output     = 'screen')
+    atlas1_controller = Node(
+        package='lightsaber',         # <-- your package name
+        executable='atlas',            # <-- your entrypoint name
+        name='atlas1_controller',
+        namespace='atlas1',
+        output='screen',
+        parameters=[
+            {'robot_name':        'atlas1'},
+            {'other_robot_name':  'atlas2'},
+            {'pelvis_xyz': [-0.75, 0.0, 1.0]},
+            {'pelvis_rpy': [0.0, 0.0, 0.0]},         # roll, pitch, yaw
+        ],
+    )
+
+    atlas2_controller = Node(
+        package='lightsaber',
+        executable='atlas',
+        name='atlas2_controller',
+        namespace='atlas2',
+        output='screen',
+        parameters=[
+            {'robot_name':        'atlas2'},
+            {'other_robot_name':  'atlas1'},
+            {'pelvis_xyz': [0.75, 0.0, 1.0]},
+            {'pelvis_rpy': [0.0, 0.0, pi]},         # roll, pitch, yaw
+        ],
+    )
     
-    atlas2 = Node(
+    target_spawner = Node(
         name       = 'lightsaber',
-        namespace = 'atlas2',
         package    = 'lightsaber',
-        executable = 'atlas2',
+        executable = 'target',
         output     = 'screen')
 
 
@@ -101,6 +108,7 @@ def generate_launch_description():
         node_robot_state_publisher1,
         node_robot_state_publisher2,
         node_rviz,
-        atlas1,
-        atlas2,
+        atlas1_controller,
+        atlas2_controller,
+        target_spawner,
     ])
