@@ -95,26 +95,12 @@ class TrajectoryNode(Node):
                                 'r_arm_wry', 'r_arm_wrx']
         self.arm_idx = [self.jointnames.index(n) for n in self.arm_joint_names]
 
-        self.lam     = 4.0
+        self.lam     = 1.0
         self.dq_num  = 1e-4
 
         # target in WORLD frame (saber tip target)
         self.p_target            = np.array([1.0, 0.0, 0.5])
         self.has_external_target = False
-
-        # --------------------------------------------------
-        # CYCLIC MOTION STATE
-        self.STATE_GO_TO_TARGET = 0
-        self.STATE_WAIT         = 1
-        self.STATE_RETURN_HOME  = 2
-
-        self.state = self.STATE_GO_TO_TARGET
-        self.wait_start_time = None
-        self.wait_duration = 1.0  # seconds
-
-        # zero (home) arm configuration
-        self.q_home_arm = np.zeros(6)
-
 
         ##############################################################
         # SHARED RANDOM TARGET (SAME FOR BOTH ROBOTS)
@@ -160,7 +146,6 @@ class TrajectoryNode(Node):
             msg.linear.z
         ], dtype=float)
         self.has_external_target = True
-        self.state = self.STATE_GO_TO_TARGET
 
         # Debug log so you can see both robots receiving the target
         self.get_logger().info(
@@ -205,7 +190,7 @@ class TrajectoryNode(Node):
         T = T @ self._T(Reye(), np.array([0.0, -0.06, 0.0]))
 
         # 8) hand to saber tip offset
-        saber_offset = np.array([0.0, 0.0, 0.41])
+        saber_offset = np.array([0.0, 0.0, 0.41 * 2])
         T = T @ self._T(Reye(), saber_offset)
 
         # saber tip in pelvis frame
@@ -236,6 +221,7 @@ class TrajectoryNode(Node):
     # Update function
     def update(self):
         self.t   = self.t + self.dt
+        self.now = self.now + rclpy.time.Duration(seconds=self.dt)
 
         # pelvis pose in world (PARAMETERIZED)
         ppelvis = self.ppelvis
@@ -267,36 +253,9 @@ class TrajectoryNode(Node):
         # convert to WORLD frame: p_w = Rpelvis * p_pelvis + ppelvis
         p_tip_world = Rpelvis @ p_tip_pelvis + ppelvis
 
-        # STATE MACHINE: decide desired target
-        now = self.get_clock().now().nanoseconds * 1e-9
-
-        # distance to current target
-        dist_to_target = np.linalg.norm(self.p_target - p_tip_world)
-
-        if self.state == self.STATE_GO_TO_TARGET:
-            p_des = self.p_target
-            if dist_to_target < 0.03:
-                self.state = self.STATE_WAIT
-                self.wait_start_time = now
-
-        elif self.state == self.STATE_WAIT:
-            p_des = p_tip_world  # hold position
-            if now - self.wait_start_time > self.wait_duration:
-                self.state = self.STATE_RETURN_HOME
-
-        elif self.state == self.STATE_RETURN_HOME:
-            # compute world-frame home position
-            p_home_pelvis = self.fk_right_hand(self.q_home_arm)
-            p_des = Rpelvis @ p_home_pelvis + ppelvis
-
-            if np.linalg.norm(q_arm - self.q_home_arm) < 0.05:
-                self.state = self.STATE_GO_TO_TARGET
-        
         # task-space error in world frame
-        e_world  = p_des - p_tip_world
-        e_pelvis = Rpelvis.T @ e_world
-
-        xdot = self.lam * e_pelvis
+        e     = self.p_target - p_tip_world
+        xdot  = self.lam * e
 
         # numerical jacobian in pelvis frame
         J = self.jacobian_right_hand(q_arm)  # 3x6
@@ -319,8 +278,7 @@ class TrajectoryNode(Node):
         self.qdot = qcdot
 
         # Publish joint states and TF
-        header = Header(stamp=self.get_clock().now().to_msg(), frame_id=self.world_frame)
-
+        header = Header(stamp=self.now.to_msg(), frame_id=self.world_frame)
 
         self.pubjoint.publish(JointState(
             header=header,

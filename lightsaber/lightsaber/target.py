@@ -16,7 +16,7 @@ class SharedTargetPublisher(Node):
         self.pub_target = self.create_publisher(Twist, '/shared_target', 10)
         self.pub_marker = self.create_publisher(Marker, '/shared_target_marker', 10)
 
-        self.timer_period = 10.0  # seconds between new random targets
+        self.timer_period = 4.0  # seconds between new random targets
         self.timer = self.create_timer(self.timer_period, self.update_target)
 
         self.get_logger().info("Shared target publisher started")
