@@ -74,7 +74,7 @@ def generate_launch_description():
         parameters=[
             {'robot_name':        'atlas1'},
             {'other_robot_name':  'atlas2'},
-            {'pelvis_xyz': [-0.75, 0.0, 1.0]},
+            {'pelvis_xyz': [-1.25, 0.0, 1.0]},
             {'pelvis_rpy': [0.0, 0.0, 0.0]},         # roll, pitch, yaw
         ],
     )
@@ -88,7 +88,7 @@ def generate_launch_description():
         parameters=[
             {'robot_name':        'atlas2'},
             {'other_robot_name':  'atlas1'},
-            {'pelvis_xyz': [0.75, 0.0, 1.0]},
+            {'pelvis_xyz': [1.25, 0.0, 1.0]},
             {'pelvis_rpy': [0.0, 0.0, pi]},         # roll, pitch, yaw
         ],
     )

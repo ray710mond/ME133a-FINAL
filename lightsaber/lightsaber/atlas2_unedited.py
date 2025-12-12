@@ -57,11 +57,6 @@ class TrajectoryNode(Node):
             'other_robot_name', 'atlas2'
         ).get_parameter_value().string_value
 
-        # robot-specific default target (world frame)
-        self.p_target = np.array([1.0, 0.0, 0.5])
-        self.has_external_target = False
-
-
         # Frames
         self.pelvis_frame = f'{self.robot_name}/pelvis'
         self.world_frame  = 'world'
@@ -92,10 +87,6 @@ class TrajectoryNode(Node):
 
         self.jointnames = atlasnames
 
-        self.control_enabled = False
-        self.start_time = self.get_clock().now().nanoseconds * 1e-9
-
-
         self.qc   = np.zeros(len(self.jointnames))
         self.qdot = np.zeros(len(self.jointnames))
 
@@ -104,22 +95,15 @@ class TrajectoryNode(Node):
                                 'r_arm_wry', 'r_arm_wrx']
         self.arm_idx = [self.jointnames.index(n) for n in self.arm_joint_names]
 
-        # task joints = back + right arm (for inverse kinematics)
-        self.task_joint_names = [
-            'back_bkz', 'back_bky', 'back_bkx',
-            'r_arm_shz', 'r_arm_shx',
-            'r_arm_ely', 'r_arm_elx',
-            'r_arm_wry', 'r_arm_wrx'
-        ]
-
-        self.task_idx = [self.jointnames.index(n)
-                         for n in self.task_joint_names]
-
         self.lam     = 4.0
         self.dq_num  = 1e-4
 
+        # target in WORLD frame (saber tip target)
+        self.p_target            = np.array([1.0, 0.0, 0.5])
+        self.has_external_target = False
+
         # --------------------------------------------------
-        # cyclic motion state
+        # CYCLIC MOTION STATE
         self.STATE_GO_TO_TARGET = 0
         self.STATE_WAIT         = 1
         self.STATE_RETURN_HOME  = 2
@@ -138,19 +122,7 @@ class TrajectoryNode(Node):
         self.q_elbow_des = -0.6
 
         # zero (home) arm configuration
-        # desired home arm configuration (radians)
-        # order: [shz, shx, ely, elx, wry, wrx]
-        self.q_home_arm = np.array([
-            0.900,   # r_arm_shz
-           -0.400,   # r_arm_shx
-            0.000,   # r_arm_ely
-           -0.400,   # r_arm_elx
-            0.100,   # r_arm_wry
-           -0.100,   # r_arm_wrx
-        ])
-
-        self.q_home_task = np.zeros(9)
-        self.q_home_task[3:9] = self.q_home_arm
+        self.q_home_arm = np.zeros(6)
 
 
         ##############################################################
@@ -168,8 +140,6 @@ class TrajectoryNode(Node):
         # IMPORTANT: relative names -> respect namespace
         self.pubjoint = self.create_publisher(JointState, 'joint_states', 10)
         self.tfbroad  = TransformBroadcaster(self)
-
-        self.elbow_task_idx = self.task_joint_names.index('r_arm_ely')
 
         self.get_logger().info("Waiting for a joint_states subscriber...")
         while not self.count_subscribers('joint_states'):
@@ -216,25 +186,17 @@ class TrajectoryNode(Node):
         T[0:3, 3]   = p
         return T
 
-    def fk_right_hand(self, q_task):  # forward kinematics to SABER TIP (in pelvis frame)
-        # unpack joints
-        q_bkz, q_bky, q_bkx = q_task[0:3]
-        q_shz, q_shx, q_ely, q_elx, q_wry, q_wrx = q_task[3:9]
+    def fk_right_hand(self, q):  # forward kinematics to SABER TIP (in pelvis frame)
+        q_shz = q[0]
+        q_shx = q[1]
+        q_ely = q[2]
+        q_elx = q[3]
+        q_wry = q[4]
+        q_wrx = q[5]
 
-        # START AT PELVIS FRAME
-        T = self._T(Reye(), np.zeros(3))
+        # pelvis frame origin
+        T = self._T(Reye(), np.array([-0.0125, 0.0, 0.212]))
 
-        # back chain
-        # pelvis -> ltorso (back_bkz)
-        T = T @ self._T(Rotz(q_bkz), np.array([-0.0125, 0.0, 0.0]))
-
-        # ltorso -> mtorso (back_bky)
-        T = T @ self._T(Roty(q_bky), np.array([0.0, 0.0, 0.162]))
-
-        # mtorso -> utorso (back_bkx)
-        T = T @ self._T(Rotx(q_bkx), np.array([0.0, 0.0, 0.05]))
-
-        # arm chain
         # 1) r_arm_shz
         T = T @ self._T(Rotz(q_shz), np.array([0.1406, -0.2256, 0.4776]))
         # 2) r_arm_shx
@@ -258,13 +220,13 @@ class TrajectoryNode(Node):
         # saber tip in pelvis frame
         return T[0:3, 3]
 
-    def jacobian_right_hand(self, q_task):
-        J  = np.zeros((3, 9))
+    def jacobian_right_hand(self, q):
+        J  = np.zeros((3, 6))
         dq = self.dq_num
 
-        for i in range(9):
-            q_plus  = q_task.copy()
-            q_minus = q_task.copy()
+        for i in range(6):
+            q_plus  = q.copy()
+            q_minus = q.copy()
             q_plus[i]  += dq
             q_minus[i] -= dq
 
@@ -282,32 +244,6 @@ class TrajectoryNode(Node):
 
     # Update function
     def update(self):
-        now = self.get_clock().now().nanoseconds * 1e-9
-
-        # --- STARTUP DELAY: do nothing for first 5 seconds ---
-        if now - self.start_time < 5.0:
-            header = Header(
-                stamp=self.get_clock().now().to_msg(),
-                frame_id=self.world_frame
-            )
-
-            # publish static joint state (no motion)
-            self.pubjoint.publish(JointState(
-                header=header,
-                name=self.jointnames,
-                position=self.qc.tolist(),
-                velocity=[0.0] * len(self.qc)
-            ))
-
-            # publish pelvis TF so RViz stays happy
-            self.tfbroad.sendTransform(TransformStamped(
-                header=header,
-                child_frame_id=self.pelvis_frame,
-                transform=Transform_from_Rp(self.Rpelvis, self.ppelvis)
-            ))
-
-            return
-
         self.t   = self.t + self.dt
 
         # pelvis pose in world (PARAMETERIZED)
@@ -315,7 +251,7 @@ class TrajectoryNode(Node):
         Rpelvis = self.Rpelvis
 
         # right-arm joint vector
-        q_task = np.array([self.qc[i] for i in self.task_idx])
+        q_arm = np.array([self.qc[i] for i in self.arm_idx])
 
         # circular default target in world frame (used until we see shared target)
         Cx = 1.0
@@ -335,7 +271,7 @@ class TrajectoryNode(Node):
             self.p_target = circle_target
 
         # current saber tip in pelvis frame
-        p_tip_pelvis = self.fk_right_hand(q_task)
+        p_tip_pelvis = self.fk_right_hand(q_arm)
 
         # convert to WORLD frame: p_w = Rpelvis * p_pelvis + ppelvis
         p_tip_world = Rpelvis @ p_tip_pelvis + ppelvis
@@ -359,10 +295,10 @@ class TrajectoryNode(Node):
 
         elif self.state == self.STATE_RETURN_HOME:
             # compute world-frame home position
-            p_home_pelvis = self.fk_right_hand(self.q_home_task)
+            p_home_pelvis = self.fk_right_hand(self.q_home_arm)
             p_des = Rpelvis @ p_home_pelvis + ppelvis
 
-            if np.linalg.norm(q_task - self.q_home_task) < 0.05:
+            if np.linalg.norm(q_arm - self.q_home_arm) < 0.05:
                 self.state = self.STATE_GO_TO_TARGET
         
         # task-space error in world frame
@@ -372,36 +308,21 @@ class TrajectoryNode(Node):
         xdot = self.lam * e_pelvis
 
         # numerical jacobian in pelvis frame
-        J = self.jacobian_right_hand(q_task)
+        J = self.jacobian_right_hand(q_arm)  # 3x6
 
         # under-determined: 3 eqns, 6 unknowns, least squares
-        # primary task: damped least squares
-        W = np.diag([0.5, 0.05, 0.05, 1, 1, 1, 1, 1, 1])
-        Jw = J @ W
-        JJt = Jw @ Jw.T
-        J_damped_inv = W @ J.T @ np.linalg.inv(JJt + self.gamma**2 * np.eye(3))
+        qdot_arm, *_ = np.linalg.lstsq(J, xdot, rcond=None)
 
-        qdot_primary = J_damped_inv @ xdot
-
-        # secondary task: elbow outward
-        qdot_secondary = np.zeros(9)
-        qdot_secondary[self.elbow_task_idx] = \
-            self.k_secondary * (self.q_elbow_des - q_task[self.elbow_task_idx])
-
-        # nullspace projector
-        N = np.eye(9) - J_damped_inv @ J
-        qdot_task = qdot_primary + N @ qdot_secondary
-
-        # integrate joints
-        q_task_new = q_task + self.dt * qdot_task
+        # integrate arm joints
+        q_arm_new = q_arm + self.dt * qdot_arm
 
         # write arm joints back into full Atlas joint vector
         qc    = self.qc.copy()
         qcdot = np.zeros_like(self.qc)
 
-        for k, idx in enumerate(self.task_idx):
-            qc[idx]    = q_task_new[k]
-            qcdot[idx] = qdot_task[k]
+        for k, idx in enumerate(self.arm_idx):
+            qc[idx]    = q_arm_new[k]
+            qcdot[idx] = qdot_arm[k]
 
         self.qc   = qc
         self.qdot = qcdot
