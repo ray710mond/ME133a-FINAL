@@ -11,7 +11,6 @@ otherfiles = [
     ('share/' + package_name + '/launch', glob('launch/*')),
     ('share/' + package_name + '/urdf',   glob('urdf/*')),
     ('share/' + package_name + '/rviz', glob('rviz/*')),
-    ('share/' + package_name + '/gazebo', glob('gazebo/*')),
 ]
 
 
