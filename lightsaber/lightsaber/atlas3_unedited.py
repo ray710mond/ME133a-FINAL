@@ -115,7 +115,7 @@ class TrajectoryNode(Node):
         self.task_idx = [self.jointnames.index(n)
                          for n in self.task_joint_names]
 
-        self.lam     = 7.0
+        self.lam     = 4.0
         self.dq_num  = 1e-4
 
         # --------------------------------------------------
@@ -126,7 +126,7 @@ class TrajectoryNode(Node):
 
         self.state = self.STATE_GO_TO_TARGET
         self.wait_start_time = None
-        self.wait_duration = 0.1  # seconds
+        self.wait_duration = 1.0  # seconds
 
         # damping for damped least squares
         self.gamma = 0.05
@@ -348,7 +348,7 @@ class TrajectoryNode(Node):
 
         if self.state == self.STATE_GO_TO_TARGET:
             p_des = self.p_target
-            if dist_to_target < 0.05:
+            if dist_to_target < 0.03:
                 self.state = self.STATE_WAIT
                 self.wait_start_time = now
 
@@ -362,7 +362,7 @@ class TrajectoryNode(Node):
             p_home_pelvis = self.fk_right_hand(self.q_home_task)
             p_des = Rpelvis @ p_home_pelvis + ppelvis
 
-            if np.linalg.norm(q_task - self.q_home_task) < 0.01:
+            if np.linalg.norm(q_task - self.q_home_task) < 0.05:
                 self.state = self.STATE_GO_TO_TARGET
         
         # task-space error in world frame
@@ -385,14 +385,8 @@ class TrajectoryNode(Node):
 
         # secondary task: elbow outward
         qdot_secondary = np.zeros(9)
-
-        if self.state == self.STATE_RETURN_HOME:
-            # pull all task joints to home
-            qdot_secondary = 2.0 * (self.q_home_task - q_task)
-        else:
-            # elbow-out posture during motion
-            qdot_secondary[self.elbow_task_idx] = \
-                self.k_secondary * (self.q_elbow_des - q_task[self.elbow_task_idx])
+        qdot_secondary[self.elbow_task_idx] = \
+            self.k_secondary * (self.q_elbow_des - q_task[self.elbow_task_idx])
 
         # nullspace projector
         N = np.eye(9) - J_damped_inv @ J

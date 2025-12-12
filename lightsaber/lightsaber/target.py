@@ -16,7 +16,7 @@ class SharedTargetPublisher(Node):
         self.pub_target = self.create_publisher(Twist, '/shared_target', 10)
         self.pub_marker = self.create_publisher(Marker, '/shared_target_marker', 10)
 
-        self.timer_period = 4.0  # seconds between new random targets
+        self.timer_period = 1.0  # seconds between new random targets
         self.timer = self.create_timer(self.timer_period, self.update_target)
 
         self.get_logger().info("Shared target publisher started")
@@ -25,8 +25,8 @@ class SharedTargetPublisher(Node):
     def sample_point(self):
         # vertical plane between robots (x = 0 plane)
         x = 0.0
-        y = uniform(-0.75, 0.75)
-        z = uniform(1.0, 2.25)
+        y = uniform(-0.20, 0.20)
+        z = uniform(0.5, 2.0)
         return np.array([x, y, z])
 
     def update_target(self):
