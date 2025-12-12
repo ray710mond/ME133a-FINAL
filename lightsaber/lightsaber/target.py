@@ -25,8 +25,8 @@ class SharedTargetPublisher(Node):
     def sample_point(self):
         # vertical plane between robots (x = 0 plane)
         x = 0.0
-        y = uniform(-0.5, 0.5)
-        z = uniform(0.75, 1.25)
+        y = uniform(-0.75, 0.75)
+        z = uniform(1.0, 2.25)
         return np.array([x, y, z])
 
     def update_target(self):
